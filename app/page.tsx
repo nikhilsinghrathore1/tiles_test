@@ -1,103 +1,210 @@
-import Image from "next/image";
+// app/page.tsx or pages/index.tsx
+'use client';
+
+import Head from 'next/head';
+import { useEffect } from 'react';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  useEffect(() => {
+    // Dynamically load all your scripts if needed
+    const scripts = [
+      '/data/audio.js',
+      '/data/battleZones.js',
+      '/data/collisions.js',
+      '/data/attacks.js',
+      '/data/monsters.js',
+      '/data/characters.js',
+      '/js/utils.js',
+      '/classes.js',
+      '/index.js',
+      '/battleScene.js',
+    ];
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    scripts.forEach(src => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      document.body.appendChild(script);
+    });
+  }, []);
+
+  return (
+    <>
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+          rel="stylesheet"
+        />
+        <style>{`
+          * {
+            font-family: 'Press Start 2P', cursive;
+            box-sizing: border-box;
+          }
+          body {
+            background-color: black;
+            overflow: hidden;
+          }
+          h1 {
+            margin: 0;
+          }
+          button {
+            border: 0;
+            cursor: pointer;
+            font-size: 16px;
+          }
+          button:hover {
+            background-color: #ddd;
+          }
+        `}</style>
+      </Head>
+
+      <div style={{ display: 'inline-block', position: 'relative' }}>
+        <div
+          id="overlappingDiv"
+          style={{
+            backgroundColor: 'black',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        ></div>
+
+        <canvas></canvas>
+
+        <div
+          id="characterDialogueBox"
+          style={{
+            backgroundColor: 'white',
+            height: 140,
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            borderTop: '4px black solid',
+            display: 'none',
+            padding: 12,
+          }}
+        ></div>
+
+        <div id="userInterface" style={{ display: 'none' }}>
+          {/* Enemy Health */}
+          <div
+            style={{
+              backgroundColor: 'white',
+              width: 250,
+              position: 'absolute',
+              top: 50,
+              left: 50,
+              border: '4px black solid',
+              padding: 12,
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <h1 style={{ fontSize: 16 }}>Draggle</h1>
+            <div style={{ position: 'relative' }}>
+              <div style={{ height: 5, backgroundColor: '#ccc', marginTop: 10 }}></div>
+              <div
+                id="enemyHealthBar"
+                style={{
+                  height: 5,
+                  backgroundColor: 'green',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Player Health */}
+          <div
+            style={{
+              backgroundColor: 'white',
+              width: 250,
+              position: 'absolute',
+              top: 330,
+              right: 50,
+              border: '4px black solid',
+              padding: 12,
+            }}
           >
-            Read our docs
-          </a>
+            <h1 style={{ fontSize: 16 }}>Emby</h1>
+            <div style={{ position: 'relative' }}>
+              <div style={{ height: 5, backgroundColor: '#ccc', marginTop: 10 }}></div>
+              <div
+                id="playerHealthBar"
+                style={{
+                  height: 5,
+                  backgroundColor: 'green',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Battle UI */}
+          <div
+            style={{
+              backgroundColor: 'white',
+              height: 140,
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              borderTop: '4px black solid',
+              display: 'flex',
+            }}
+          >
+            <div
+              id="dialogueBox"
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                backgroundColor: 'white',
+                padding: 12,
+                display: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              sdkfjlsdajl
+            </div>
+            <div
+              id="attacksBox"
+              style={{
+                width: '66.66%',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+              }}
+            ></div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '33.33%',
+                borderLeft: '4px black solid',
+              }}
+            >
+              <h1 id="attackType" style={{ fontSize: 16 }}>
+                Attack Type
+              </h1>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 }
