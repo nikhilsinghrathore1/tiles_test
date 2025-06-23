@@ -168,18 +168,78 @@ const foreground = new Sprite({
   image: foregroundImage
 })
 
-const keys = {
-  w: {
-    pressed: false
-  },
-  a: {
-    pressed: false
-  },
-  s: {
-    pressed: false
-  },
-  d: {
-    pressed: false
+// Movement system based on clicks
+const movement = {
+  target: null,
+  speed: 30,
+  isMoving: false
+}
+
+// Tree system
+const trees = []
+class Tree {
+  constructor({ position }) {
+    this.position = position
+    this.stage = 0 // 0: seed, 1: sapling, 2: young tree, 3: mature tree
+    this.maxStage = 3
+    this.growthTime = 3000 // 3 seconds per stage
+    this.lastGrowth = Date.now()
+    this.size = 10
+    this.color = '#8B4513' // Brown for trunk
+  }
+
+  update() {
+    if (this.stage < this.maxStage && Date.now() - this.lastGrowth > this.growthTime) {
+      this.stage++
+      this.lastGrowth = Date.now()
+      this.size += 15
+    }
+  }
+
+  draw() {
+    const ctx = c
+    ctx.save()
+    
+    switch(this.stage) {
+      case 0: // Seed
+        ctx.fillStyle = '#654321'
+        ctx.fillRect(this.position.x, this.position.y, 5, 5)
+        break
+      case 1: // Sapling
+        ctx.fillStyle = '#8B4513'
+        ctx.fillRect(this.position.x - 2, this.position.y - 5, 4, 15)
+        ctx.fillStyle = '#90EE90'
+        ctx.beginPath()
+        ctx.arc(this.position.x, this.position.y - 8, 8, 0, Math.PI * 2)
+        ctx.fill()
+        break
+      case 2: // Young tree
+        ctx.fillStyle = '#8B4513'
+        ctx.fillRect(this.position.x - 4, this.position.y - 10, 8, 25)
+        ctx.fillStyle = '#228B22'
+        ctx.beginPath()
+        ctx.arc(this.position.x, this.position.y - 15, 15, 0, Math.PI * 2)
+        ctx.fill()
+        break
+      case 3: // Mature tree
+        ctx.fillStyle = '#654321'
+        ctx.fillRect(this.position.x - 6, this.position.y - 15, 12, 35)
+        ctx.fillStyle = '#006400'
+        ctx.beginPath()
+        ctx.arc(this.position.x, this.position.y - 20, 25, 0, Math.PI * 2)
+        ctx.fill()
+        // Add some texture
+        ctx.fillStyle = '#228B22'
+        ctx.beginPath()
+        ctx.arc(this.position.x - 8, this.position.y - 25, 12, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(this.position.x + 8, this.position.y - 25, 12, 0, Math.PI * 2)
+        ctx.fill()
+        break
+    }
+    
+    ctx.restore()
   }
 }
 
@@ -196,26 +256,152 @@ const renderables = [
   ...battleZones,
   ...characters,
   player,
-  foreground
+  foreground,
+  ...trees
 ]
 
 const battle = {
   initiated: false
 }
 
+function getDistance(pos1, pos2) {
+  return Math.sqrt(Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.y - pos1.y, 2))
+}
+
+function movePlayerToTarget() {
+  if (!movement.target || !movement.isMoving) return false
+
+  const playerCenter = {
+    x: player.position.x + player.width / 2,
+    y: player.position.y + player.height / 2
+  }
+
+  const distance = getDistance(playerCenter, movement.target)
+  
+  // Stop if we're close enough to the target
+  if (distance < movement.speed) {
+    movement.isMoving = false
+    movement.target = null
+    player.animate = false
+    return false
+  }
+
+  // Calculate direction
+  const dx = movement.target.x - playerCenter.x
+  const dy = movement.target.y - playerCenter.y
+  const magnitude = Math.sqrt(dx * dx + dy * dy)
+  
+  const normalizedDx = dx / magnitude
+  const normalizedDy = dy / magnitude
+
+  // Determine which direction is dominant for sprite selection
+  if (Math.abs(normalizedDx) > Math.abs(normalizedDy)) {
+    if (normalizedDx > 0) {
+      player.image = player.sprites.right
+    } else {
+      player.image = player.sprites.left
+    }
+  } else {
+    if (normalizedDy > 0) {
+      player.image = player.sprites.down
+    } else {
+      player.image = player.sprites.up
+    }
+  }
+
+  // Calculate movement offsets
+  const moveX = normalizedDx * movement.speed
+  const moveY = normalizedDy * movement.speed
+
+  // Check for collisions before moving
+  let canMoveX = true
+  let canMoveY = true
+
+  // Check X-axis collision
+  for (let i = 0; i < boundaries.length; i++) {
+    const boundary = boundaries[i]
+    if (rectangularCollision({
+      rectangle1: player,
+      rectangle2: {
+        ...boundary,
+        position: {
+          x: boundary.position.x - moveX,
+          y: boundary.position.y
+        }
+      }
+    })) {
+      canMoveX = false
+      break
+    }
+  }
+
+  // Check Y-axis collision
+  for (let i = 0; i < boundaries.length; i++) {
+    const boundary = boundaries[i]
+    if (rectangularCollision({
+      rectangle1: player,
+      rectangle2: {
+        ...boundary,
+        position: {
+          x: boundary.position.x,
+          y: boundary.position.y - moveY
+        }
+      }
+    })) {
+      canMoveY = false
+      break
+    }
+  }
+
+  // Check character collisions
+  checkForCharacterCollision({
+    characters,
+    player,
+    characterOffset: { x: -moveX, y: -moveY }
+  })
+
+  // Move the world (inverse of player movement)
+  if (canMoveX) {
+    movables.forEach((movable) => {
+      movable.position.x -= moveX
+    })
+  }
+  
+  if (canMoveY) {
+    movables.forEach((movable) => {
+      movable.position.y -= moveY
+    })
+  }
+
+  // If we can't move in either direction, stop
+  if (!canMoveX && !canMoveY) {
+    movement.isMoving = false
+    movement.target = null
+    player.animate = false
+    return false
+  }
+
+  player.animate = true
+  return true
+}
+
 function animate() {
   const animationId = window.requestAnimationFrame(animate)
+  
+  // Update trees
+  trees.forEach(tree => tree.update())
+  
   renderables.forEach((renderable) => {
     renderable.draw()
   })
 
-  let moving = true
-  player.animate = false
-
   if (battle.initiated) return
 
+  // Handle click-based movement
+  const isMoving = movePlayerToTarget()
+
   // activate a battle
-  if (keys.w.pressed || keys.a.pressed || keys.s.pressed || keys.d.pressed) {
+  if (isMoving) {
     for (let i = 0; i < battleZones.length; i++) {
       const battleZone = battleZones[i]
       const overlappingArea =
@@ -270,144 +456,9 @@ function animate() {
       }
     }
   }
-
-  if (keys.w.pressed && lastKey === 'w') {
-    player.animate = true
-    player.image = player.sprites.up
-
-    checkForCharacterCollision({
-      characters,
-      player,
-      characterOffset: { x: 0, y: 3 }
-    })
-
-    for (let i = 0; i < boundaries.length; i++) {
-      const boundary = boundaries[i]
-      if (
-        rectangularCollision({
-          rectangle1: player,
-          rectangle2: {
-            ...boundary,
-            position: {
-              x: boundary.position.x,
-              y: boundary.position.y + 3
-            }
-          }
-        })
-      ) {
-        moving = false
-        break
-      }
-    }
-
-    if (moving)
-      movables.forEach((movable) => {
-        movable.position.y += 3
-      })
-  } else if (keys.a.pressed && lastKey === 'a') {
-    player.animate = true
-    player.image = player.sprites.left
-
-    checkForCharacterCollision({
-      characters,
-      player,
-      characterOffset: { x: 3, y: 0 }
-    })
-
-    for (let i = 0; i < boundaries.length; i++) {
-      const boundary = boundaries[i]
-      if (
-        rectangularCollision({
-          rectangle1: player,
-          rectangle2: {
-            ...boundary,
-            position: {
-              x: boundary.position.x + 3,
-              y: boundary.position.y
-            }
-          }
-        })
-      ) {
-        moving = false
-        break
-      }
-    }
-
-    if (moving)
-      movables.forEach((movable) => {
-        movable.position.x += 3
-      })
-  } else if (keys.s.pressed && lastKey === 's') {
-    player.animate = true
-    player.image = player.sprites.down
-
-    checkForCharacterCollision({
-      characters,
-      player,
-      characterOffset: { x: 0, y: -3 }
-    })
-
-    for (let i = 0; i < boundaries.length; i++) {
-      const boundary = boundaries[i]
-      if (
-        rectangularCollision({
-          rectangle1: player,
-          rectangle2: {
-            ...boundary,
-            position: {
-              x: boundary.position.x,
-              y: boundary.position.y - 3
-            }
-          }
-        })
-      ) {
-        moving = false
-        break
-      }
-    }
-
-    if (moving)
-      movables.forEach((movable) => {
-        movable.position.y -= 3
-      })
-  } else if (keys.d.pressed && lastKey === 'd') {
-    player.animate = true
-    player.image = player.sprites.right
-
-    checkForCharacterCollision({
-      characters,
-      player,
-      characterOffset: { x: -3, y: 0 }
-    })
-
-    for (let i = 0; i < boundaries.length; i++) {
-      const boundary = boundaries[i]
-      if (
-        rectangularCollision({
-          rectangle1: player,
-          rectangle2: {
-            ...boundary,
-            position: {
-              x: boundary.position.x - 3,
-              y: boundary.position.y
-            }
-          }
-        })
-      ) {
-        moving = false
-        break
-      }
-    }
-
-    if (moving)
-      movables.forEach((movable) => {
-        movable.position.x -= 3
-      })
-  }
 }
-// animate()
 
-let lastKey = ''
+// Handle spacebar for character interactions
 window.addEventListener('keydown', (e) => {
   if (player.isInteracting) {
     switch (e.key) {
@@ -441,48 +492,122 @@ window.addEventListener('keydown', (e) => {
       document.querySelector('#characterDialogueBox').style.display = 'flex'
       player.isInteracting = true
       break
-    case 'w':
-      keys.w.pressed = true
-      lastKey = 'w'
-      break
-    case 'a':
-      keys.a.pressed = true
-      lastKey = 'a'
-      break
-
-    case 's':
-      keys.s.pressed = true
-      lastKey = 's'
-      break
-
-    case 'd':
-      keys.d.pressed = true
-      lastKey = 'd'
-      break
   }
 })
 
-window.addEventListener('keyup', (e) => {
-  switch (e.key) {
-    case 'w':
-      keys.w.pressed = false
-      break
-    case 'a':
-      keys.a.pressed = false
-      break
-    case 's':
-      keys.s.pressed = false
-      break
-    case 'd':
-      keys.d.pressed = false
-      break
-  }
-})
-
+// Handle mouse clicks for movement and tree planting
 let clicked = false
-addEventListener('click', () => {
+let clickTimeout = null
+
+canvas.addEventListener('click', (e) => {
+  console.log("clicked")
   if (!clicked) {
-    audio.Map.play()
+    // audio.Map.play()
     clicked = true
   }
+
+  // Don't move if player is interacting with character
+  if (player.isInteracting) return
+
+  // Get click position relative to canvas
+  const rect = canvas.getBoundingClientRect()
+  console.log(rect)
+  const clickX = e.clientX - rect.left
+  const clickY = e.clientY - rect.top
+
+  // Handle double-click for tree planting
+  if (clickTimeout) {
+    // This is a double-click - plant a tree
+    clearTimeout(clickTimeout)
+    clickTimeout = null
+    
+    // Convert screen coordinates to world coordinates
+    const worldX = clickX - offset.x
+    const worldY = clickY - offset.y
+    
+    // Create new tree at clicked position
+    const newTree = new Tree({
+      position: {
+        x: worldX,
+        y: worldY
+      }
+    })
+    
+    trees.push(newTree)
+    console.log("Tree planted at:", worldX, worldY)
+    return
+  }
+
+  // Single click - set timeout for potential double-click
+  clickTimeout = setTimeout(() => {
+    clickTimeout = null
+    
+    // This is a single click - move player
+    // Calculate direction for single step movement
+    const playerCenter = {
+      x: player.position.x + player.width / 2,
+      y: player.position.y + player.height / 2
+    }
+
+    const dx = clickX - playerCenter.x
+    const dy = clickY - playerCenter.y
+
+    // Determine which direction to move (one step only)
+    let moveX = 0
+    let moveY = 0
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Move horizontally
+      moveX = dx > 0 ? movement.speed : -movement.speed
+      player.image = dx > 0 ? player.sprites.right : player.sprites.left
+    } else {
+      // Move vertically
+      moveY = dy > 0 ? movement.speed : -movement.speed
+      player.image = dy > 0 ? player.sprites.down : player.sprites.up
+    }
+
+    // Check for collisions before moving
+    let canMove = true
+
+    // Check boundary collisions
+    for (let i = 0; i < boundaries.length; i++) {
+      const boundary = boundaries[i]
+      if (rectangularCollision({
+        rectangle1: player,
+        rectangle2: {
+          ...boundary,
+          position: {
+            x: boundary.position.x - moveX,
+            y: boundary.position.y - moveY
+          }
+        }
+      })) {
+        canMove = false
+        break
+      }
+    }
+
+    // Check character collisions
+    if (canMove) {
+      checkForCharacterCollision({
+        characters,
+        player,
+        characterOffset: { x: -moveX, y: -moveY }
+      })
+    }
+
+    // Move one step if no collision
+    if (canMove) {
+      movables.forEach((movable) => {
+        movable.position.x -= moveX
+        movable.position.y -= moveY
+      })
+      
+      // Brief animation for the step
+      player.animate = true
+      setTimeout(() => {
+        player.animate = false
+      }, 200)
+    }
+  }, 300) // 300ms timeout for double-click detection
 })
